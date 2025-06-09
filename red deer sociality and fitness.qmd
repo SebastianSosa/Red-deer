@@ -1,0 +1,294 @@
+---
+title: "Red Deer sociality and fitness"
+author: "Sebastian Sosa"
+format: html
+editor: visual
+---
+
+# Dependencies
+
+```{r}
+#| message: false
+#| warning: false
+library(ANTs)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(ggplot2)
+library(MASS)
+library(asnipe)
+library(survival)
+library(survminer)
+library(rptR)
+library(PerformanceAnalytics)
+library(gtsummary)
+library(coxme)
+theme_set(
+  theme_minimal(base_size = 14) +  # base_size sets most text sizes
+    theme(
+      plot.title = element_text(size = 18, face = "bold"),
+      axis.title = element_text(size = 14),
+      axis.text = element_text(size = 12),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 12)
+    )
+)
+update_geom_defaults("point", list(size = 16))
+```
+
+
+# Analysis
+## MRQAP
+```{r}
+load("MRQAP_data.RData")
+mrqap.mum = sample = NULL
+
+# for each networks
+for (a in 1:length(original.network)) {
+  # Get only individual present in all data sets
+  ids = Reduce(intersect, list(colnames(original.network[[a]]),
+                               colnames(ped.mum[[a]]),
+                               colnames(mat.HRO[[a]]),
+                               colnames(mat.spde[[a]]),
+                               colnames(mat.spdeX[[a]]),
+                               colnames(mat.spdeY[[a]])))
+  
+  if(length(ids) <2){
+    print(c("to few individuals in ", names(original.network)[a]))
+    mrqap.mum[[a]] = NULL
+    next
+  }
+  
+  
+  net = original.network[[a]][colnames(original.network [[a]]) %in% ids, colnames(original.network [[a]]) %in% ids]
+  
+  net = net[order(colnames(net)),order(colnames(net))]
+  
+  ped = ped.mum[[a]][colnames(ped.mum[[a]]) %in% ids, colnames(ped.mum[[a]]) %in% ids]
+  ped = ped[order(colnames(ped)),order(colnames(ped))]
+  
+  hro = mat.HRO[[a]][colnames(mat.HRO[[a]]) %in% ids, colnames(mat.HRO[[a]]) %in% ids]
+  hro = hro[order(colnames(hro)),order(colnames(hro))]
+  
+  spde = mat.spde[[a]][colnames(mat.spde[[a]]) %in% ids, colnames(mat.spde[[a]]) %in% ids]
+  
+  spdeX = mat.spdeX[[a]][colnames(mat.spdeX[[a]]) %in% ids, colnames(mat.spdeX[[a]]) %in% ids]
+  
+  spdeY = mat.spdeY[[a]][colnames(mat.spdeY[[a]]) %in% ids, colnames(mat.spdeY[[a]]) %in% ids]
+  
+  ped = ped[order(colnames(ped)),order(colnames(ped))]
+  
+  sample = c(sample,ncol(net))
+  if(any(c(is.null(ncol(net)),
+           is.null(ncol(ped)),
+           is.null(ncol(hro )),
+           is.null(ncol(spde))))){next()}
+  
+  if(any(c(all(net == 0),
+           all(ped == 0),
+           all(hro == 0),
+           all(spde == 0)))){next()}
+  # MRQAP
+  mrqap.mum[[a]] = asnipe::mrqap.dsp(net ~ ped + hro + spdeX + spdeY)
+  names(mrqap.mum)[a] = names(original.network)[a]
+}
+
+
+names(mrqap.mum)= names(original.network)
+mrqap.mum = mrqap.mum[-1]
+mrqap.p = lapply(mrqap.mum, function(x){
+  c = x$P.values[2]
+})
+mrqap.p = unlist(mrqap.p)
+names(mrqap.p) = names(mrqap.mum)
+
+mrqap.coef = lapply(mrqap.mum, function(x){
+  x$coefficients[2]
+})
+mrqap.coef= unlist(mrqap.coef)
+names(mrqap.coef) = names(mrqap.mum)
+
+t = ifelse(mrqap.p < 0.05, "singificant", "non singificant")
+```
+### Figure 2
+```{r}
+ggplot(data = NULL, aes(y = mrqap.coef, x= names(mrqap.coef)))+geom_point(size = 8)+geom_line()+theme(legend.position = "none")+ylab("Regression coefficients (red =  significant value)")+xlab("Year")
+```
+
+## Repetability
+```{r}
+#| message: false
+#| warning: false
+annual=read.csv('annual_data.csv')
+rep = rpt(formula = strength ~ (1|id), grname = "id", data = annual, datatype = "Gaussian", npermut = 10000)
+rep
+```
+
+## LRS
+```{r}
+repro=read.csv('scaled_life_time_data.csv') # scaled data for analysis
+repro2=read.csv('life_time_data.csv') # non scale data for metrics descriptions
+```
+
+### Measures summary
+```{r}
+tbl_summary(
+  repro2[,colnames(repro2) %in% c('sum_degree', 'sum_strength',  'sum_eigen')],
+  missing = "no" # Don't show missing values
+) %>%
+bold_labels() 
+
+```
+
+### Network metrics correlations (Appendix 1)
+```{r}
+chart.Correlation(repro[,colnames(repro) %in% c("sum_eigen", "sum_strength", "sum_degree")], histogram=TRUE, pch=19)
+```
+### LBS poisson model
+```{r}
+m1=glm(LBS~sum_strength+lifespan+mean_matSize+mean_E+mean_N+mean_HRO, family = poisson(), data = repro)
+print(car::vif(m1)) # VIF
+```
+
+### Table 2
+```{r}
+tab_model(m1, transform = NULL, show.se = TRUE, digits = 3, pred.labels = c('Intercept', 'Life Time Strength','Lifespan', 'Matriline Size', 'Annual mean East', 'Annual mean North', 'Annual mean HRO'))
+```
+
+### Figure 3
+```{r}
+p1 = plot_model(m1, type = 'pred', terms ='lifespan', show.data = T)+xlab('Lifespan')
+p2 = plot_model(m1, type = 'pred', terms ='sum_strength', show.data = T)+xlab('Life Time Strength')
+ggarrange(p1,p2, ncol = 2, nrow = 1)
+```
+
+
+### LRS poisson model
+```{r}
+m2=glm(LRS~sum_strength+lifespan+mean_matSize+mean_E+mean_N+mean_HRO, family = poisson(), data = repro)
+print(car::vif(m2)) # VIF
+```
+
+### Table 3
+```{r}
+tab_model(m2, transform = NULL, show.se = TRUE, digits = 3, pred.labels = c('Intercept', 'Life Time Strength','Lifespan', 'Matriline Size', 'Annual mean East', 'Annual mean North', 'Annual mean HRO'))
+```
+
+### Figure 4
+```{r}
+p3 = plot_model(m2, type = 'pred', terms ='lifespan', show.data = T)+xlab('Lifespan')
+p4 = plot_model(m2, type = 'pred', terms ='sum_strength', show.data = T)+xlab('Life Time Strength')
+ggarrange(p3,p4, ncol = 2, nrow = 1)
+```
+
+## Survival analysis
+### Data
+```{r}
+surv = read.csv(file='scale_annual.csv')
+```
+
+### Proportional Hazards Regression Model 
+```{r}
+surv_obj <- Surv(surv$start, surv$end, surv$death)
+```
+
+
+```{r}
+model_coxme <- coxme(surv_obj ~ strength + matSize + HRO2 + LifetimeE + LifetimeN + (1 | mat/id),data = surv,  na.action = na.omit)
+summary(model_coxme)
+```
+
+
+
+### Model diagnostic
+#### Test the Proportional Hazards Assumption of a Cox Regression
+```{r}
+ph_test <- cox.zph(model_coxme)
+print(ph_test)
+```
+
+#### residual heterodasiticity
+```{r}
+rows_omitted <- model_coxme$na.action
+if (!is.null(rows_omitted)) {
+  model_data <- surv[-rows_omitted, ]
+} else {
+  model_data <- surv
+}
+mresid <- residuals(model_coxme, type = "martingale")
+
+
+# For strength
+plot(model_data$strength, mresid,
+     xlab = "Strength", ylab = "Martingale Residuals")
+lines(lowess(model_data$strength, mresid), col = "red")
+abline(h = 0, lty = 2)
+
+# For LifetimeE
+plot(model_data$LifetimeE, mresid,
+     xlab = "LifetimeE", ylab = "Martingale Residuals",
+     main = "Martingale Residuals vs. LifetimeE")
+lines(lowess(model_data$LifetimeE, mresid), col = "red")
+abline(h = 0, lty = 2)
+
+# For LifetimeN
+plot(model_data$LifetimeN, mresid,
+     xlab = "LifetimeN", ylab = "Martingale Residuals",
+     main = "Martingale Residuals vs. LifetimeN")
+lines(lowess(model_data$LifetimeN, mresid), col = "red")
+abline(h = 0, lty = 2)
+
+```
+
+### Figure 5 
+```{r}
+summa = summary(surv$strength)
+surv$strength2 = NULL
+surv$strength2 = ifelse(surv$strength >= summa[[5]], "3rd Qu.", surv$strength)
+surv$strength2 = ifelse(surv$strength >= summa[[2]] & surv$strength < summa[[5]], "mean", surv$strength2)
+surv$strength2 = ifelse(surv$strength < summa[[2]], "1st Qu.", surv$strength2)
+survfit(Surv(surv$start, surv$end, surv$death)~strength2 , data=surv)
+ggsurvplot(
+  survfit(
+    Surv(surv$start, surv$end, surv$death)~strength2, data=surv),
+  data = surv, 
+  fun = "event", 
+  conf.int = TRUE, 
+  risk.table = TRUE, 
+  risk.table.col="strata", 
+  ggtheme =  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 18),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 18)
+  ))+
+  xlab("Age")   
+
+```
+
+## Calves' survival during the first year
+### Data
+```{r}
+calves = read.csv(file='scaled_calves_survival.csv')
+```
+### Binomial model
+```{r}
+m3 = glmer(ego.survived.frist.year ~  mom.strength +  matSize + HRO2 + LifetimeE + LifetimeN +(1|ego.birth)  + (1|ego.mom) + (1|matriline), family = binomial(), data = calves)
+tab_model(m3, transform = NULL, show.se = TRUE, digits = 3, pred.labels = c('Intercept', 'Mother strength','Matriline size', 'HRO', 'East', 'North'))
+```
+### Figure
+```{r}
+t = ggeffects::ggpredict(m3, terms = "LifetimeE [all]")
+
+p5 = ggplot(data = calves, aes(x = LifetimeE, y = ego.survived.frist.year)) +
+  geom_histogram(data = calves[calves$ego.survived.frist.year ==0, ], aes(x = LifetimeE, y = stat(count)/1000, fill=factor(ego.survived.frist.year)), bins = 15, na.rm = TRUE) +
+  geom_histogram(data = calves[calves$ego.survived.frist.year == 1, ], aes(x = LifetimeE, y = -1*stat(count/1000), fill=factor(ego.survived.frist.year)), bins = 15, na.rm = TRUE, position = position_nudge(y = 1))+
+  theme(legend.position = "none")+
+  geom_ribbon(data= t, aes(x = x,ymin= conf.low, ymax= conf.high, y= NULL), fill= 'grey80')+
+  geom_line(data = t, aes(x = x , y = predicted ))+
+  ylab("First year survival probability")+
+  xlab("East")
+p5
+
+```
