@@ -26,6 +26,15 @@ This repository contains all the necessary components to reproduce the analysis 
     *   `scaled_calves_survival.csv`
 
 ---
+## Data Availability
+
+The primary data for this analysis are archived at Dryad:
+[https://zenodo.org/records/18152463](https://zenodo.org/records/18152463)
+
+While copies of the data are included in this repository for reproducibility, 
+the Dryad submission should be considered the permanent record for the dataset. 
+Please cite the Dryad package if you use this data for secondary analyses.
+
 ## Data Overview
 
 The dataset includes six data files. "Scaled" files are versions of the raw data that have been centered and scaled (Z-scores) to facilitate statistical modeling.
