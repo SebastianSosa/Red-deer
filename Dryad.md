@@ -5,9 +5,15 @@
 
 ## Data Overview
 
-This dataset contains four data files required to interpret the results of the associated publication. The files contain summary metrics for individual female deer, longitudinal survival data, and calf survival data.
+This Dryad repository contains the primary data files (four .csv files) required to interpret the results of the associated publication. These files contain summary metrics for individual female deer, longitudinal survival data, and calf survival data.
 
-**Note on Scaling:** Files with "scaled" in the filename contain data that have been centered and scaled (Z-scores) to facilitate statistical modeling.
+**Code and Reproducibility:**
+The Quarto source code (`red_deer_analysis.qmd`) containing the full analysis workflow and the auxiliary network data file (`MRQAP_data.RData`) are **not** included in this Dryad package. They are archived separately at Zenodo to facilitate reproducibility. 
+
+**Link to Code/Workflow:** https://zenodo.org/records/18152463
+
+**Note on Scaling:** 
+Files with "scaled" in the filename contain data that have been centered and scaled (Z-scores) to facilitate statistical modeling.
 
 ### File List
 1.  `life_time_data.csv`
@@ -23,6 +29,7 @@ This dataset contains four data files required to interpret the results of the a
 **Description:** Summary metrics for individual female deer calculated over their entire lifespan.
 **Row definition:** One row per individual female.
 
+*   `X`: Row index (numerical identifier/artifact of data export).
 *   `id`: Unique identifier for the individual female deer (alphanumeric string).
 *   `lifespan`: Total years lived (unit: years).
 *   `sum_degree`: The sum of the individual's annual degree centrality scores over its lifetime (count).
@@ -43,14 +50,15 @@ This dataset contains four data files required to interpret the results of the a
 **Description:** Longitudinal data used for survival analysis.
 **Row definition:** One row per individual per year (person-year format).
 
+*   `X`: Row index (numerical identifier/artifact of data export).
 *   `id`: Unique identifier for the individual (alphanumeric string).
 *   `year`: The calendar year of observation (unit: year).
 *   `degree`: Number of social associates in that year (count).
 *   `strength`: Sum of the weights of social ties in that year (sum of weights).
 *   `eigen`: Eigenvector centrality in that year (unitless index).
-*   `mat`: Matriline identifier (categorical).
-*   `start`: Start time of the interval for survival modeling (unit: age in years).
+*   `mat`: Matriline identifier code (categorical).
 *   `end`: End time of the interval for survival modeling (unit: age in years).
+*   `start`: Start time of the interval for survival modeling (unit: age in years).
 *   `death`: Binary indicator of mortality (1 = died in this interval, 0 = survived).
 *   `DeathYear`: Calendar year of death (unit: year).
 *   `BirthYear`: Calendar year of birth (unit: year).
@@ -61,11 +69,13 @@ This dataset contains four data files required to interpret the results of the a
 *   `LifetimeN`: The overall lifetime average spatial coordinate - Northings (unit: meters).
 *   `centroid`: Spatial centroid of the individual's sightings (coordinate pair).
 *   `sex`: Biological sex (all "F" for females).
+*   `matriline`: Name or ID of the matrilineal group (categorical).
 
 ### 3. scaled_calves_survival.csv
 **Description:** Data linking maternal social traits to the survival of specific offspring.
 **Row definition:** One row per calf.
 
+*   `X`: Row index (numerical identifier/artifact of data export).
 *   `ego`: Unique identifier for the calf (alphanumeric string).
 *   `ego.birth`: Calendar year the calf was born (unit: year).
 *   `ego.mom`: Unique identifier for the calf's mother (alphanumeric string).
@@ -80,17 +90,16 @@ This dataset contains four data files required to interpret the results of the a
 *   `LifetimeE`: Maternal spatial metric - Eastings (unit: meters).
 *   `LifetimeN`: Maternal spatial metric - Northings (unit: meters).
 *   `centroid`: Maternal spatial centroid.
+*   `year`: The calendar year associated with the maternal traits/calf birth (unit: year).
+*   `matriline`: Name or ID of the matrilineal group (categorical).
 
 ---
 
-## Code and Software Availability
+## Software and Environment
 
-The analysis code (`red_deer_analysis.qmd`) and auxiliary network data files (`MRQAP_data.RData`) are not included in this Dryad package but are available for download at Zenodo to facilitate reproducibility.
+As noted above, the analysis code is archived at Zenodo (https://zenodo.org/records/18152463).
 
-**Software/Code Location:**
-[INSERT LINK TO YOUR ZENODO OR GITHUB REPOSITORY HERE]
-
-**Software Requirements:**
+**Software Requirements to run the analysis:**
 *   R (v4.2.0 or later)
 *   Quarto
 *   R Packages: ANTs, lme4, lmerTest, sjPlot, ggplot2, MASS, asnipe, survival, survminer, rptR, PerformanceAnalytics, gtsummary, coxme.
